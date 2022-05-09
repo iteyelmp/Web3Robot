@@ -3,17 +3,28 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 
-import "./IW3RC3.sol";
-
 contract Web3CuteRobotAccessories is ERC1155, Ownable {
+    using Strings for uint256;
+
+    address public w3q;
+    string public gateway;
+
     mapping(uint256 => bytes) public typeNames;
 
-    IW3RC3 public w3q;
+    constructor(address _w3q, string memory _gateway) ERC1155('') {
+        w3q = _w3q;
+        gateway = _gateway;
+    }
 
-    constructor(address _contractDataStorageAddress) ERC1155('') {
-        w3q = IW3RC3(_contractDataStorageAddress);
+    function setW3q(address _w3q) public onlyOwner {
+        w3q = _w3q;
+    }
+
+    function setGateway(string calldata _gateway) public onlyOwner {
+        gateway = _gateway;
     }
 
     function mintBatch(uint256[] memory typeId, uint256[] memory amounts) external onlyOwner {
@@ -27,7 +38,7 @@ contract Web3CuteRobotAccessories is ERC1155, Ownable {
     function uri(uint256 typeId) public view override returns (string memory) {
         bytes memory json = abi.encodePacked(
             '{"name":"', typeNames[typeId], '",',
-            '"image":"data:image/png;base64,', renderImage(typeId), '"}'
+            '"image":"', renderImage(typeId), '"}'
         );
         return string(abi.encodePacked(
             "data:application/json;base64,",
@@ -36,7 +47,12 @@ contract Web3CuteRobotAccessories is ERC1155, Ownable {
     }
 
     function renderImage(uint256 typeId) public view returns (string memory) {
-        (bytes memory filePng,) = w3q.read(typeNames[typeId]);
-        return Base64.encode(filePng);
+        return string(abi.encodePacked(
+                gateway,
+                Strings.toHexString(uint256(uint160(w3q)), 20),
+                '/',
+                typeNames[typeId],
+                '.png'
+            ));
     }
 }

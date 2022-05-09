@@ -6,12 +6,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
-import "./IW3RC3.sol";
 
 interface IWeb3CuteRobotAccessories {
     function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data) external;
 
-    function renderImage(uint256 typeId) external view returns (string memory);
+    function typeNames(uint256 typeId) external view returns (bytes memory);
 }
 
 contract Web3CuteRobot is ERC721, Ownable {
@@ -30,14 +29,20 @@ contract Web3CuteRobot is ERC721, Ownable {
 
     uint256 public totalMinted = 0;
 
-    IW3RC3 public w3q;
+    address public w3qRender;
+    string public gateway;
 
-    constructor(address contractDataStorage_) ERC721("Web3CuteRobot", "Web3CuteRobot") {
-        setContractDataStorageAddress(contractDataStorage_);
+    constructor(address _w3qRender, string memory _gateway) ERC721("Web3CuteRobot", "Web3CuteRobot") {
+        w3qRender = _w3qRender;
+        gateway = _gateway;
     }
 
-    function setContractDataStorageAddress(address _contractDataStorageAddress) public onlyOwner {
-        w3q = IW3RC3(_contractDataStorageAddress);
+    function setW3Render(address _w3qRender) public onlyOwner {
+        w3qRender = _w3qRender;
+    }
+
+    function setGateway(string calldata _gateway) public onlyOwner {
+        gateway = _gateway;
     }
 
     function mintRobot(address to, uint256 tokenId) external {
@@ -53,7 +58,7 @@ contract Web3CuteRobot is ERC721, Ownable {
         bytes memory json = abi.encodePacked(
             '{"name":"', names[tokenId], '",',
             '"description":"', descriptions[tokenId], '",',
-            '"image":"data:image/svg+xml;base64,', renderImage(tokenId), '"}'
+            '"image":"', renderImage(tokenId), '"}'
         );
 
         return string(abi.encodePacked(
@@ -69,21 +74,19 @@ contract Web3CuteRobot is ERC721, Ownable {
             Accessory memory a = accessories[tokenId][accIndex];
             access = string(abi.encodePacked(
                 access,
-                '<image xlink:href="data:image/png;base64,',
-                IWeb3CuteRobotAccessories(a.accessoryAddress).renderImage(a.typeId),
-                '"/>'
+                IWeb3CuteRobotAccessories(a.accessoryAddress).typeNames(a.typeId),
+                '|'
             ));
         }
 
-        bytes memory fileName = tokenId % 2 == 0 ? bytes('0.png') : bytes('1.png');
-        (bytes memory bgPng,) = w3q.read(fileName);
-        bytes memory svg = abi.encodePacked(
-            '<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">',
-            '<image xlink:href="data:image/png;base64,', Base64.encode(bgPng), '"/>',
-            access,
-            '</svg>'
-        );
-        return Base64.encode(svg);
+        return string(abi.encodePacked(
+                gateway,
+                Strings.toHexString(uint256(uint160(w3qRender)), 20),
+                '/renderImage/',
+                access,
+                tokenId.toString(),
+                '.svg'
+            ));
     }
 
     function setName(uint256 tokenId, string memory name) public onlyOwner {
